@@ -6,20 +6,40 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Download, Loader2 } from "lucide-react"
 import { processBankFiles } from "@/lib/excel-processor"
+import { useToast } from "@/components/ui/use-toast"
 
 export default function BankPage() {
+  const { toast } = useToast()
   const [reckonFile, setReckonFile] = useState<File | null>(null)
   const [bankFile, setBankFile] = useState<File | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
 
   const handleProcess = async () => {
-    if (!reckonFile || !bankFile) return
+    if (!reckonFile || !bankFile) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please upload both Reckon and Bank files"
+      })
+      return
+    }
 
     setIsProcessing(true)
     try {
-      await processBankFiles(reckonFile, bankFile)
+      const result = await processBankFiles(reckonFile, bankFile)
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: "Bank reconciliation report has been generated and downloaded",
+        })
+      }
     } catch (error) {
       console.error("Error processing files:", error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to process bank files"
+      })
     } finally {
       setIsProcessing(false)
     }
