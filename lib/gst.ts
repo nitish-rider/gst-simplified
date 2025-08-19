@@ -15,7 +15,7 @@ async function readExcelFile(file: File) {
         if (!worksheet) throw new Error('Could not find worksheet');
         const rawData = XLSX.utils.sheet_to_json<RawRow>(worksheet, {header: 'A'});
         if (rawData.length < 3) throw new Error('Excel file does not have enough rows');
-        const data: ProcessedRow[] = rawData.slice(2).map((row) => {
+        const data: ProcessedRow[] = rawData.slice(8).map((row) => {
             const gstNumber = (row['C'] || '').toString().trim();
             const name = (row['B'] || '').toString().trim();
             const tax2 = typeof row['G'] === 'number' ? row['G'] : Number(row['G']) || 0;
@@ -49,7 +49,7 @@ async function readB2BSheet(file: File) {
         if (!workbook.SheetNames.includes("B2B")) throw new Error("B2B sheet not found in the workbook");
         const worksheet = workbook.Sheets["B2B"];
         if (!worksheet) throw new Error("Could not read B2B worksheet");
-        const data = XLSX.utils.sheet_to_json<RawRow>(worksheet, {header: "A"});
+        const data = XLSX.utils.sheet_to_json<RawRow>(worksheet, {header: "A"}).splice(4);
         if (data.length === 0) throw new Error("Excel file is empty");
         const firstRow = data[0];
         const kValue = firstRow?.["K"];
