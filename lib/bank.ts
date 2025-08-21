@@ -48,26 +48,26 @@ function findMismatches(reckonData: string[][], bankData: string[][]) {
 
     // Extract debit and credit amounts from Reckon
     const reckonDebits = reckonEntries.map(row => ({
-        date: row[0],
+        date: new Date(row[0]),
         name: row[1],
         amount: parseInt(String(row[2]).replace(/,/g, '')) || 0 // Debit column
     })).filter(entry => entry.amount > 0);
 
     const reckonCredits = reckonEntries.map(row => ({
-        date: row[0],
+        date: new Date(row[0]),
         name: row[1],
         amount: parseInt(String(row[3]).replace(/,/g, '')) || 0 // Credit column
     })).filter(entry => entry.amount > 0);
 
     // Extract withdrawal and deposit amounts from Bank
     const bankWithdrawals = bankEntries.map(row => ({
-        date: row[0],
+        date: new Date(row[0]),
         name: row[1],
         amount: parseInt(String(row[2]).replace(/,/g, '')) || 0 // Withdrawal column
     })).filter(entry => entry.amount > 0);
 
     const bankDeposits = bankEntries.map(row => ({
-        date: row[0],
+        date: new Date(row[0]),
         name: row[1],
         amount: parseInt(String(row[3]).replace(/,/g, '')) || 0 // Deposit column
     })).filter(entry => entry.amount > 0);
@@ -78,24 +78,85 @@ function findMismatches(reckonData: string[][], bankData: string[][]) {
     const matchedBankDepositIndices = new Set();
     const matchedBankWithdrawalIndices = new Set();
 
+    // Helper function to calculate similarity between two strings
+    function stringSimilarity(str1: string, str2: string): number {
+        str1 = str1.toLowerCase();
+        str2 = str2.toLowerCase();
+        const len1 = str1.length;
+        const len2 = str2.length;
+        const maxDist = Math.max(len1, len2);
+        let matches = 0;
+        for (let i = 0; i < len1; i++) {
+            for (let j = 0; j < len2; j++) {
+                if (str1[i] === str2[j]) {
+                    matches++;
+                    break;
+                }
+            }
+        }
+        return matches / maxDist;
+    }
+
+    // Helper function to calculate match score
+    function calculateMatchScore(reckonEntry: any, bankEntry: any): number {
+        // Start with amount match (required)
+        if (Math.abs(reckonEntry.amount - bankEntry.amount) >= 0.01) {
+            return -1;
+        }
+
+        let score = 1;
+
+        // Add date proximity score (0-1)
+        const daysDiff = Math.abs(reckonEntry.date.getTime() - bankEntry.date.getTime()) / (1000 * 60 * 60 * 24);
+        score += Math.max(0, 1 - daysDiff / 7); // Full point if same day, decreasing over a week
+
+        // Add description similarity score (0-1)
+        const similarity = stringSimilarity(reckonEntry.name, bankEntry.name);
+        score += similarity;
+
+        return score;
+    }
+
     // Match Reckon Debits with Bank Deposits
+    const debitMatches: Array<{reckonIndex: number, bankIndex: number, score: number}> = [];
     reckonDebits.forEach((reckonEntry, reckonIndex) => {
         bankDeposits.forEach((bankEntry, bankIndex) => {
-            if (Math.abs(reckonEntry.amount - bankEntry.amount) < 0.01) {
-                matchedReckonDebitIndices.add(reckonIndex);
-                matchedBankDepositIndices.add(bankIndex);
+            const score = calculateMatchScore(reckonEntry, bankEntry);
+            if (score >= 0) {
+                debitMatches.push({ reckonIndex, bankIndex, score });
             }
         });
     });
 
+    // Sort matches by score and apply them
+    debitMatches.sort((a, b) => b.score - a.score);
+    debitMatches.forEach(match => {
+        if (!matchedReckonDebitIndices.has(match.reckonIndex) && 
+            !matchedBankDepositIndices.has(match.bankIndex)) {
+            matchedReckonDebitIndices.add(match.reckonIndex);
+            matchedBankDepositIndices.add(match.bankIndex);
+        }
+    });
+
     // Match Reckon Credits with Bank Withdrawals
+    const creditMatches: Array<{reckonIndex: number, bankIndex: number, score: number}> = [];
     reckonCredits.forEach((reckonEntry, reckonIndex) => {
         bankWithdrawals.forEach((bankEntry, bankIndex) => {
-            if (Math.abs(reckonEntry.amount - bankEntry.amount) < 0.01) {
-                matchedReckonCreditIndices.add(reckonIndex);
-                matchedBankWithdrawalIndices.add(bankIndex);
+            const score = calculateMatchScore(reckonEntry, bankEntry);
+            if (score >= 0) {
+                creditMatches.push({ reckonIndex, bankIndex, score });
             }
         });
+    });
+
+    // Sort matches by score and apply them
+    creditMatches.sort((a, b) => b.score - a.score);
+    creditMatches.forEach(match => {
+        if (!matchedReckonCreditIndices.has(match.reckonIndex) && 
+            !matchedBankWithdrawalIndices.has(match.bankIndex)) {
+            matchedReckonCreditIndices.add(match.reckonIndex);
+            matchedBankWithdrawalIndices.add(match.bankIndex);
+        }
     });
 
     // Get unmatched entries
