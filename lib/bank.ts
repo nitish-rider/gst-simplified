@@ -50,26 +50,26 @@ function findMismatches(reckonData: string[][], bankData: string[][]) {
     const reckonDebits = reckonEntries.map(row => ({
         date: new Date(row[0]),
         name: row[1],
-        amount: parseInt(String(row[2]).replace(/,/g, '')) || 0 // Debit column
+        amount: parseFloat(String(row[2]).replace(/,/g, '')) || 0 // Debit column
     })).filter(entry => entry.amount > 0);
 
     const reckonCredits = reckonEntries.map(row => ({
         date: new Date(row[0]),
         name: row[1],
-        amount: parseInt(String(row[3]).replace(/,/g, '')) || 0 // Credit column
+        amount: parseFloat(String(row[3]).replace(/,/g, '')) || 0 // Credit column
     })).filter(entry => entry.amount > 0);
 
     // Extract withdrawal and deposit amounts from Bank
     const bankWithdrawals = bankEntries.map(row => ({
         date: new Date(row[0]),
         name: row[1],
-        amount: parseInt(String(row[2]).replace(/,/g, '')) || 0 // Withdrawal column
+        amount: parseFloat(String(row[2]).replace(/,/g, '')) || 0 // Withdrawal column
     })).filter(entry => entry.amount > 0);
 
     const bankDeposits = bankEntries.map(row => ({
         date: new Date(row[0]),
         name: row[1],
-        amount: parseInt(String(row[3]).replace(/,/g, '')) || 0 // Deposit column
+        amount: parseFloat(String(row[3]).replace(/,/g, '')) || 0 // Deposit column
     })).filter(entry => entry.amount > 0);
 
     // Track matched entries
@@ -78,10 +78,40 @@ function findMismatches(reckonData: string[][], bankData: string[][]) {
     const matchedBankDepositIndices = new Set();
     const matchedBankWithdrawalIndices = new Set();
 
+    // Helper function to normalize string for comparison
+    function normalizeString(str: string): string {
+        return str
+            .toLowerCase()
+            .replace(/[^a-z0-9\s]/g, '') // Remove special characters
+            .replace(/\s+/g, ' ')         // Replace multiple spaces with single space
+            .trim();
+    }
+
     // Helper function to calculate similarity between two strings
     function stringSimilarity(str1: string, str2: string): number {
-        str1 = str1.toLowerCase();
-        str2 = str2.toLowerCase();
+        str1 = normalizeString(str1);
+        str2 = normalizeString(str2);
+
+        // If either string is empty after normalization, return 0
+        if (!str1 || !str2) return 0;
+
+        // Check for exact match after normalization
+        if (str1 === str2) return 1;
+
+        // Check if one string contains the other
+        if (str1.includes(str2) || str2.includes(str1)) {
+            return 0.9;
+        }
+
+        // Split into words and find common words
+        const words1 = str1.split(' ');
+        const words2 = str2.split(' ');
+        const commonWords = words1.filter(word => words2.includes(word));
+
+        // Calculate word-based similarity
+        const wordSimilarity = (2.0 * commonWords.length) / (words1.length + words2.length);
+
+        // Calculate character-based similarity for remaining parts
         const len1 = str1.length;
         const len2 = str2.length;
         const maxDist = Math.max(len1, len2);
@@ -94,13 +124,18 @@ function findMismatches(reckonData: string[][], bankData: string[][]) {
                 }
             }
         }
-        return matches / maxDist;
+        const charSimilarity = matches / maxDist;
+
+        // Return weighted average of word and character similarity
+        return (wordSimilarity * 0.7 + charSimilarity * 0.3);
     }
 
     // Helper function to calculate match score
     function calculateMatchScore(reckonEntry: any, bankEntry: any): number {
         // Start with amount match (required)
-        if (Math.abs(reckonEntry.amount - bankEntry.amount) >= 0.01) {
+        // Allow for a small difference in amounts (0.1% or 1 rupee, whichever is smaller)
+        const amountTolerance = Math.min(1, reckonEntry.amount * 0.001);
+        if (Math.abs(reckonEntry.amount - bankEntry.amount) > amountTolerance) {
             return -1;
         }
 
