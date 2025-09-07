@@ -130,8 +130,13 @@ function findMismatches(reckonData: string[][], bankData: string[][]) {
         return (wordSimilarity * 0.7 + charSimilarity * 0.3);
     }
 
-    // Helper function to calculate match score
-    function calculateMatchScore(reckonEntry: any, bankEntry: any): number {
+    interface Entry {
+        date: Date;
+        name: string;
+        amount: number;
+    }
+
+    function calculateMatchScore(reckonEntry: Entry, bankEntry: Entry): number {
         // Start with amount match (required)
         // Allow for a small difference in amounts (0.1% or 1 rupee, whichever is smaller)
         const amountTolerance = Math.min(1, reckonEntry.amount * 0.001);
@@ -153,12 +158,12 @@ function findMismatches(reckonData: string[][], bankData: string[][]) {
     }
 
     // Match Reckon Debits with Bank Deposits
-    const debitMatches: Array<{reckonIndex: number, bankIndex: number, score: number}> = [];
+    const debitMatches: Array<{ reckonIndex: number, bankIndex: number, score: number }> = [];
     reckonDebits.forEach((reckonEntry, reckonIndex) => {
         bankDeposits.forEach((bankEntry, bankIndex) => {
             const score = calculateMatchScore(reckonEntry, bankEntry);
             if (score >= 0) {
-                debitMatches.push({ reckonIndex, bankIndex, score });
+                debitMatches.push({reckonIndex, bankIndex, score});
             }
         });
     });
@@ -166,7 +171,7 @@ function findMismatches(reckonData: string[][], bankData: string[][]) {
     // Sort matches by score and apply them
     debitMatches.sort((a, b) => b.score - a.score);
     debitMatches.forEach(match => {
-        if (!matchedReckonDebitIndices.has(match.reckonIndex) && 
+        if (!matchedReckonDebitIndices.has(match.reckonIndex) &&
             !matchedBankDepositIndices.has(match.bankIndex)) {
             matchedReckonDebitIndices.add(match.reckonIndex);
             matchedBankDepositIndices.add(match.bankIndex);
@@ -174,12 +179,12 @@ function findMismatches(reckonData: string[][], bankData: string[][]) {
     });
 
     // Match Reckon Credits with Bank Withdrawals
-    const creditMatches: Array<{reckonIndex: number, bankIndex: number, score: number}> = [];
+    const creditMatches: Array<{ reckonIndex: number, bankIndex: number, score: number }> = [];
     reckonCredits.forEach((reckonEntry, reckonIndex) => {
         bankWithdrawals.forEach((bankEntry, bankIndex) => {
             const score = calculateMatchScore(reckonEntry, bankEntry);
             if (score >= 0) {
-                creditMatches.push({ reckonIndex, bankIndex, score });
+                creditMatches.push({reckonIndex, bankIndex, score});
             }
         });
     });
@@ -187,7 +192,7 @@ function findMismatches(reckonData: string[][], bankData: string[][]) {
     // Sort matches by score and apply them
     creditMatches.sort((a, b) => b.score - a.score);
     creditMatches.forEach(match => {
-        if (!matchedReckonCreditIndices.has(match.reckonIndex) && 
+        if (!matchedReckonCreditIndices.has(match.reckonIndex) &&
             !matchedBankWithdrawalIndices.has(match.bankIndex)) {
             matchedReckonCreditIndices.add(match.reckonIndex);
             matchedBankWithdrawalIndices.add(match.bankIndex);
